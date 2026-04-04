@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: video-translator
+    env: python
+    buildCommand: apt-get install -y ffmpeg && pip install -r requirements.txt
+    startCommand: gunicorn -w 1 -k gevent -b 0.0.0.0:$PORT app:app --timeout 120
