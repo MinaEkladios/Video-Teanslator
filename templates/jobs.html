@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Jobs — Subtitle Studio</title>
+<script>(function(){var t=localStorage.getItem('theme')||'dark';document.documentElement.setAttribute('data-theme',t);})();</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/vars.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
+<style>
+.jobs-page { max-width: 960px; margin: 0 auto; padding: 24px 20px 60px; }
+.jobs-page h2 { font-size: 1.5rem; font-weight: 600; color: var(--color-text-1); margin-bottom: 20px; }
+.site-nav { background: var(--bg-panel); border-bottom: 1px solid #3a3a45;
+            padding: 12px 24px; display: flex; align-items: center;
+            justify-content: space-between; gap: 12px; }
+.site-nav .brand { font-weight: 700; font-size: 1.1rem; color: var(--color-text-1); text-decoration: none; }
+.site-nav .nav-links { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.site-nav .nav-links a { color: var(--color-text-2); text-decoration: none;
+                          font-size: 0.88rem; padding: 4px 8px; border-radius: var(--radius-sm);
+                          transition: background .15s, color .15s; }
+.site-nav .nav-links a:hover,
+.site-nav .nav-links a.active { background: var(--color-bg-3); color: var(--color-text-1); }
+.table-wrap { overflow-x: auto; border-radius: var(--radius-md); }
+table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+thead th { background: var(--color-bg-3); color: var(--color-text-2);
+           padding: 10px 12px; text-align: left; font-weight: 500; }
+tbody tr { background: var(--color-bg-2); border-bottom: 1px solid var(--color-bg-3);
+           cursor: pointer; }
+tbody tr:hover { background: var(--color-bg-3); }
+tbody td { padding: 10px 12px; color: var(--color-text-1); }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 0.72rem; font-weight: 600; }
+.badge-success { background: rgba(46,204,113,.15); color: #2ecc71; }
+.badge-danger  { background: rgba(231,76,60,.15);  color: #e74c3c; }
+.badge-info    { background: rgba(108,92,231,.15); color: var(--color-accent); }
+.empty-jobs { display: flex; flex-direction: column; align-items: center; padding: 60px 20px; text-align: center; }
+.empty-jobs p { color: var(--color-text-2); margin-bottom: 16px; }
+</style>
+</head>
+<body>
+<nav class="site-nav">
+  <a href="/" class="brand">Subtitle Studio</a>
+  <div class="nav-links">
+    <a href="/studio">Studio</a>
+    <a href="/jobs" class="active">My Jobs</a>
+    {% if current_user.is_admin %}<a href="/dashboard">Dashboard</a>{% endif %}
+    <a href="/auth/logout">Logout</a>
+    <button onclick="toggleTheme()" class="btn icon-btn theme-toggle-btn" title="Toggle theme">☀/☾</button>
+  </div>
+</nav>
+
+<div class="jobs-page">
+  <h2>My Jobs</h2>
+
+  {% if not jobs %}
+  <div class="empty-jobs">
+    <p>You haven't processed any videos yet.</p>
+    <a href="/studio" class="btn primary">Upload your first video →</a>
+  </div>
+  {% else %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Filename</th>
+          <th>Created</th>
+          <th>Languages</th>
+          <th>Duration</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for job in jobs %}
+        <tr onclick="goToJob('{{ job.id }}', '{{ job.status }}')">
+          <td title="{{ job.input_filename or '' }}">{{ (job.input_filename or '—')[:40] }}</td>
+          <td>{{ job.created_at.strftime('%Y-%m-%d %H:%M') if job.created_at else '—' }}</td>
+          <td>{{ job.source_lang or '?' }} → {{ job.target_lang or 'orig' }}</td>
+          <td>
+            {% if job.duration_seconds %}
+              {{ '%d:%02d'|format((job.duration_seconds // 60)|int, (job.duration_seconds % 60)|int) }}
+            {% else %}—{% endif %}
+          </td>
+          <td>
+            {% set sc = 'badge-success' if job.status in ('done','burned') else
+                        ('badge-danger' if 'fail' in job.status else 'badge-info') %}
+            <span class="badge {{ sc }}">{{ job.status }}</span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+
+<script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+<script>
+function goToJob(jobId, status) {
+  // Only navigate to the editor for jobs that have segments
+  if (['done','burned'].includes(status)) {
+    window.location.href = '/studio?job_id=' + jobId;
+  }
+}
+</script>
+</body>
+</html>

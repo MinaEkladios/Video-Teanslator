@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subtitle Studio</title>
+
+    <!-- Anti-FOUC: apply saved theme before any paint -->
+    <script>(function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
+
+    <!-- Google Fonts: Inter (UI) + Cairo (Arabic) + decorative fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&family=Inter:wght@400;500&family=Roboto:wght@400;700&family=Lobster&family=Oswald:wght@400;700&display=swap" rel="stylesheet">
+
+    <!-- Base styles, then design-system tokens (vars.css wins for theme vars) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/vars.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
+
+    <!-- RTL stylesheet — enabled at runtime by the detection script below -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/rtl.css') }}" id="rtl-stylesheet" disabled>
+</head>
+<body>
+
+<!-- Startup modal: forces user to upload and choose translation before using app -->
+<div id="startup-modal" class="modal-overlay">
+    <div class="modal">
+        <h2>Upload video &amp; choose translation</h2>
+        <div class="upload-zone" id="upload-zone">
+            <input type="file" id="startup-upload-input" accept="video/*">
+            <div class="upload-zone-hint">Click or drag &amp; drop a video file here</div>
+        </div>
+        <div id="startup-upload-status" style="margin-top:8px; color:var(--color-text-2);">No file chosen</div>
+
+        <label style="margin-top:12px; display:block; color:var(--text-muted);">Translate To</label>
+        <select id="startup-target-lang" class="lang-select">
+            <option value="">(Keep original language)</option>
+            <option value="en">English</option>
+            <option value="es">Spanish</option>
+            <option value="fr">French</option>
+            <option value="de">German</option>
+            <option value="it">Italian</option>
+            <option value="pt">Portuguese</option>
+            <option value="ru">Russian</option>
+            <option value="ja">Japanese</option>
+            <option value="ko">Korean</option>
+            <option value="zh-CN">Chinese (Simplified)</option>
+            <option value="ar">Arabic</option>
+            <option value="hi">Hindi</option>
+        </select>
+
+        <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:12px;">
+            <button id="startup-upload-btn" class="btn primary" disabled>Upload</button>
+            <button id="startup-translate-btn" class="btn success hidden" disabled>Translate & Start</button>
+            <button id="startup-newjob-btn" class="btn secondary hidden">Start New Job</button>
+        </div>
+
+        <div id="startup-progress" style="margin-top:10px; color:var(--color-text-1)"></div>
+        <div id="startup-spinner" class="spinner hidden" aria-hidden="true">
+            <div class="spinner-circle" role="status" aria-label="Loading"></div>
+            <div class="spinner-text">Transcribing & Translating...</div>
+        </div>
+    </div>
+</div>
+
+<div class="app-container">
+    <header>
+        <a href="/" class="header-brand">Subtitle Studio</a>
+        <nav class="header-nav" aria-label="Utility navigation">
+            <button class="hamburger" id="hamburger-btn" aria-label="Toggle menu" aria-expanded="false" onclick="
+                var g=document.getElementById('nav-links-group');
+                g.classList.toggle('open');
+                this.setAttribute('aria-expanded', g.classList.contains('open'));
+            ">
+                <span></span><span></span><span></span>
+            </button>
+            <div class="nav-links-group" id="nav-links-group">
+                <a href="/jobs" class="btn icon-btn nav-link" title="My Jobs">📋 My Jobs</a>
+                {% if current_user.is_admin %}
+                <a href="/dashboard" class="btn icon-btn nav-link" title="Dashboard">📊 Stats</a>
+                {% endif %}
+                <a href="/auth/logout" class="btn icon-btn nav-link" title="Logout">⏻ Logout</a>
+            </div>
+            <button onclick="toggleTheme()" class="btn icon-btn theme-toggle-btn" aria-label="Toggle light / dark theme" title="Toggle theme">☀/☾</button>
+        </nav>
+    </header>
+
+    <div class="main-workspace">
+        <!-- Left Column: Video Preview -->
+        <div class="video-section">
+            <div class="video-wrapper" id="video-wrapper">
+                <video id="main-video" controls>
+                    <source src="" type="video/mp4">
+                    Your browser does not support HTML5 video.
+                </video>
+                <div id="subtitle-overlay" class="subtitle-overlay"></div>
+                <canvas id="subtitle-canvas"></canvas>
+            </div>
+            
+            <div class="video-controls-bar">
+                <input type="file" id="video-upload" accept="video/*" hidden>
+                <div class="upload-group">
+                    <button id="main-newjob-btn" class="btn secondary hidden">Start New Job</button>
+                    <button id="burn-video" class="btn success">🔥 Burn & Download Video</button>
+                    <button id="open-styles-btn" class="btn secondary" title="Open Styles">Styles</button>
+                    <!-- SRT/VTT export buttons — revealed after transcription -->
+                    <div id="export-actions" class="export-actions-inline hidden">
+                        <a id="btn-download-srt" class="btn secondary" download>⬇ SRT</a>
+                        <a id="btn-download-vtt" class="btn secondary" download>⬇ VTT</a>
+                    </div>
+                </div>
+                <div class="time-display">
+                    <span id="current-time">00:00</span> / <span id="duration">00:00</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: Settings & Editor -->
+        <div class="editor-section">
+            
+            <!-- Style Editor moved to floating panel (triggered by the Styles button) -->
+
+            <!-- Subtitle Editor -->
+            <div class="panel subtitle-panel">
+                <div class="subtitle-panel-header">
+                    <h3>Subtitles</h3>
+                    <div class="subtitle-meta">
+                        <span id="segment-count" class="meta-badge"></span>
+                        <span id="word-count" class="meta-badge"></span>
+                    </div>
+                </div>
+
+                <!-- Segment search -->
+                <div class="search-wrap">
+                    <input type="search" id="segment-search" placeholder="Search subtitles…" autocomplete="off">
+                </div>
+
+                <!-- Manual subtitle entry (also populated by transcription) -->
+                <div class="subtitle-input-area">
+                    <div class="time-inputs">
+                        <input type="text" id="start-time" placeholder="0:00.0" title="Start time" style="width:90px">
+                        <span style="color:var(--text-muted);align-self:center;">→</span>
+                        <input type="text" id="end-time" placeholder="0:05.0" title="End time" style="width:90px">
+                        <button id="set-current-start" class="btn secondary" title="Set start to current video time" style="padding:4px 8px;font-size:0.8em;">⏮</button>
+                        <button id="set-current-end" class="btn secondary" title="Set end to current video time" style="padding:4px 8px;font-size:0.8em;">⏭</button>
+                    </div>
+                    <textarea id="subtitle-text" placeholder="Enter subtitle text here..." rows="2"></textarea>
+                    <div class="action-buttons">
+                        <button id="add-subtitle" class="btn primary">Add Subtitle</button>
+                        <button id="update-subtitle" class="btn warning hidden">Update</button>
+                        <button id="split-subtitle" class="btn secondary hidden" title="Split segment at text cursor position">✂ Split</button>
+                    </div>
+                </div>
+
+                <!-- Undo bar -->
+                <div class="undo-bar">
+                    <button id="undo-btn" class="btn icon-btn" disabled onclick="window.undo && window.undo()" title="Undo">↩ Undo <span class="count"></span></button>
+                    <button id="redo-btn" class="btn icon-btn" disabled onclick="window.redo && window.redo()" title="Redo">↪ Redo</button>
+                    <span id="save-status" class="save-status">All saved</span>
+                </div>
+
+                <!-- Subtitle list -->
+                <div class="subtitle-list" id="subtitle-list">
+                    <div class="empty-state">No subtitles yet — upload a video to begin.</div>
+                </div>
+            </div>
+
+            <!-- Export -->
+            <div class="panel export-panel">
+                <div id="export-status" class="status-msg">
+                    <div id="export-spinner" class="spinner hidden" aria-hidden="true">
+                        <div class="spinner-circle" role="status" aria-label="Processing"></div>
+                    </div>
+                    <div id="export-text" class="status-text"></div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- Floating Styles Panel (hidden by default) -->
+<div id="styles-panel" class="floating-panel hidden" aria-hidden="true">
+    <div class="floating-header">
+        <h3>Styles</h3>
+        <button id="close-styles-btn" class="btn icon-btn" title="Close">✖</button>
+    </div>
+    <div class="style-grid">
+        <div class="form-group">
+            <label>Font Family</label>
+            <select id="font-family">
+                <option value="Roboto, sans-serif">Roboto (English)</option>
+                <option value="'Cairo', sans-serif">Cairo (Arabic)</option>
+                <option value="'Lobster', cursive">Lobster</option>
+                <option value="'Oswald', sans-serif">Oswald</option>
+                <option value="Arial, sans-serif">Arial</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Font Size (px)</label>
+            <input type="number" id="font-size" value="24" min="10" max="100">
+        </div>
+        <div class="form-group">
+            <label>Color</label>
+            <input type="color" id="font-color" value="#ffffff">
+        </div>
+        <div class="form-group">
+            <label>Position</label>
+            <select id="position">
+                <option value="bottom">Bottom</option>
+                <option value="top">Top</option>
+                <option value="center">Center</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Animation (Web Preview)</label>
+            <select id="animation-type">
+                <option value="none">None</option>
+                <option value="fade">Fade In/Out</option>
+                <option value="slide-up">Slide Up</option>
+                <option value="scale">Scale Up</option>
+            </select>
+            <small style="font-size: 0.7em; color: #888;">*Export has limited animation support (Fade only)</small>
+        </div>
+
+        <!-- Outline -->
+        <div class="form-group full-width">
+            <label>Outline</label>
+            <div class="inline-row">
+                <input type="color" id="stroke-color" value="#000000" title="Outline Color">
+                <input type="range" id="stroke-width" min="0" max="4" step="0.5" value="2" title="Outline Width">
+                <span class="val-label" id="stroke-width-val">2</span>
+            </div>
+        </div>
+
+        <!-- temporarily hidden: BorderStyle=3 not supported on Windows libass -->
+        <div class="form-group full-width" style="display:none;">
+            <label><input type="checkbox" id="bg-box" style="margin-right:6px;"> Background Box</label>
+            <div class="inline-row" style="margin-top:4px;">
+                <input type="color" id="bg-color" value="#000000" title="Background Color">
+                <input type="range" id="bg-opacity" min="0" max="100" step="5" value="70" title="Background Opacity">
+                <span class="val-label" id="bg-opacity-val">70%</span>
+            </div>
+        </div>
+
+        <!-- Presets -->
+        <div class="form-group full-width">
+            <label>Presets</label>
+            <div class="preset-btns">
+                <button type="button" class="btn secondary" onclick="applyPreset('Netflix')">Netflix</button>
+                <button type="button" class="btn secondary" onclick="applyPreset('YouTube')">YouTube</button>
+                <button type="button" class="btn secondary" onclick="applyPreset('Classic')">Classic</button>
+                <button type="button" class="btn secondary" onclick="applyPreset('Arabic')">عربي</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast container -->
+<div id="toast-container" aria-live="polite"></div>
+
+<!-- Floating Progress Overlay — shown during translate and burn operations -->
+<div id="progress-overlay" class="progress-overlay hidden" aria-live="polite" aria-label="Processing">
+    <div class="progress-overlay-card">
+        <div class="progress-overlay-spinner"></div>
+        <div class="progress-overlay-body">
+            <div id="progress-overlay-msg" class="progress-overlay-msg">Processing…</div>
+            <div class="progress-bar-wrap">
+                <div id="progress-overlay-bar" class="progress-bar-fill" style="width:0%"></div>
+            </div>
+            <div id="progress-overlay-pct" class="progress-overlay-pct">0%</div>
+        </div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+<script src="{{ url_for('static', filename='js/toast.js') }}"></script>
+<script src="{{ url_for('static', filename='js/subtitle-style.js') }}"></script>
+<script src="{{ url_for('static', filename='js/video-preview.js') }}"></script>
+<script src="{{ url_for('static', filename='js/script.js') }}"></script>
+
+<!-- Theme + RTL detection: runs after DOM is ready -->
+<script>
+(function () {
+    // ── Theme persistence ────────────────────────────────────────
+    var t = localStorage.getItem('theme') || 'light';
+    document.documentElement.setAttribute('data-theme', t);
+
+    // ── RTL detection ────────────────────────────────────────────
+    var lang = document.documentElement.lang || navigator.language || 'en';
+    var rtlLangs = ['ar', 'he', 'fa', 'ur'];
+    if (rtlLangs.some(function (l) { return lang.startsWith(l); })) {
+        document.documentElement.setAttribute('dir', 'rtl');
+        var rtlSheet = document.getElementById('rtl-stylesheet');
+        if (rtlSheet) { rtlSheet.removeAttribute('disabled'); }
+    }
+})();
+</script>
+</body>
+</html>

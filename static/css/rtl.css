@@ -1,0 +1,115 @@
+/*
+ * rtl.css — Right-to-left layout overrides.
+ * Loaded in <head> with the `disabled` attribute.
+ * Enabled at runtime by the theme/RTL detection script when
+ * the page language is Arabic, Hebrew, Farsi, or Urdu.
+ */
+
+/* ── Body font switches to Arabic-optimised typeface ─────── */
+[dir="rtl"] body {
+    font-family: var(--font-arabic, 'Cairo', sans-serif);
+}
+
+/* ── Text alignment ──────────────────────────────────────── */
+[dir="rtl"] p,
+[dir="rtl"] label,
+[dir="rtl"] li {
+    text-align: right;
+}
+
+/* ── Directional spacing mirrors ─────────────────────────── */
+[dir="rtl"] .editor-section {
+    border-left: none;
+    border-right: 1px solid #3a3a45;
+}
+
+[dir="rtl"] .subtitle-item {
+    border-left: none;
+    border-right: 3px solid transparent;
+}
+[dir="rtl"] .subtitle-item.active {
+    border-right-color: var(--primary);
+}
+
+[dir="rtl"] .subtitle-item .meta {
+    flex-direction: row-reverse;
+}
+
+[dir="rtl"] .action-buttons {
+    flex-direction: row-reverse;
+}
+
+[dir="rtl"] .upload-group {
+    flex-direction: row-reverse;
+}
+
+[dir="rtl"] .time-inputs {
+    flex-direction: row-reverse;
+}
+
+[dir="rtl"] .style-grid {
+    direction: rtl;
+}
+
+/* ── Modal ────────────────────────────────────────────────── */
+[dir="rtl"] .modal h2 {
+    text-align: right;
+}
+[dir="rtl"] .modal > div[style*="justify-content:flex-end"],
+[dir="rtl"] .modal > div[style*="justify-content: flex-end"] {
+    flex-direction: row-reverse;
+}
+
+/* ── Floating styles panel ────────────────────────────────── */
+[dir="rtl"] .floating-panel {
+    right: auto;
+    left: 20px;
+}
+[dir="rtl"] .floating-header {
+    flex-direction: row-reverse;
+}
+
+/* ── Spinner text ─────────────────────────────────────────── */
+[dir="rtl"] .spinner {
+    flex-direction: row-reverse;
+}
+
+/* ── Header nav ───────────────────────────────────────────── */
+[dir="rtl"] header {
+    flex-direction: row-reverse;
+}
+
+/* ── Input fields auto-direction for mixed content ────────── */
+[dir="rtl"] input[type="text"],
+[dir="rtl"] textarea,
+[dir="rtl"] select {
+    text-align: right;
+    direction: rtl;
+}
+
+/* ── Subtitle overlay text is always auto-direction ─────────
+   (handles mixed Arabic/Latin content in subtitle lines)    */
+.subtitle-line {
+    direction: auto;
+    unicode-bidi: plaintext;
+}
+
+/* ── RTL mobile overrides (≤ 767px) ─────────────────────────
+   Mirror directional props that change at mobile breakpoints */
+@media (max-width: 767px) {
+    [dir="rtl"] .floating-panel {
+        left: 12px;
+        right: 12px;
+    }
+    [dir="rtl"] .nav-links-group {
+        right: auto;
+        left: 12px;
+    }
+    [dir="rtl"] .time-display {
+        margin-left: 0;
+        margin-right: auto;
+    }
+    [dir="rtl"] .action-buttons {
+        flex-wrap: wrap;
+    }
+}

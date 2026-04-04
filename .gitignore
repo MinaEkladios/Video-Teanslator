@@ -1,0 +1,24 @@
+.env
+
+# --- User uploads (contains user data) ---
+uploads/
+
+# --- FFmpeg binaries (large, not source-controlled) ---
+ffmpeg-8.0.1-full_build/
+
+# --- Python cache and temp files ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# --- IDE/editor/project files ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+dev.db
+
+env/
+venv/

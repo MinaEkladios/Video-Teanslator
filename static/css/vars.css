@@ -1,0 +1,96 @@
+/*
+ * vars.css — Design system tokens
+ * Loaded AFTER style.css so these :root declarations win
+ * and [data-theme="light"] overrides enable full light mode.
+ *
+ * NOTE: The existing style.css uses --bg-dark / --bg-panel / --primary /
+ * --text-main / --text-muted / --accent. Those same vars are redefined here
+ * so the entire app (new + legacy) responds to theme switching.
+ */
+
+/* ─── Fonts ─────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600&family=Inter:wght@400;500&display=swap');
+
+:root {
+    /* ── Typography ─────────────────────────── */
+    --font-sans:    'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    --font-arabic:  'Cairo', sans-serif;
+
+    /* ── Radius ─────────────────────────────── */
+    --radius-sm:  4px;
+    --radius-md:  8px;
+    --radius-lg:  16px;
+
+    /* ── Shadows ────────────────────────────── */
+    --shadow-sm:  0 2px 4px rgba(0, 0, 0, .25);
+    --shadow-md:  0 4px 16px rgba(0, 0, 0, .40);
+
+    /* ── Accent / semantic ──────────────────── */
+    --color-accent:        #6C5CE7;
+    --color-accent-hover:  #5a4bd1;
+    --color-danger:        #e74c3c;
+    --color-success:       #2ecc71;
+    --color-warning:       #f39c12;
+
+    /* ── Dark theme (DEFAULT — matches existing style.css palette) ── */
+    --color-bg-1:    #1e1e24;
+    --color-bg-2:    #2b2b36;
+    --color-bg-3:    #33333f;
+    --color-text-1:  #e0e0e0;
+    --color-text-2:  #a0a0a0;
+    --color-text-3:  #666677;
+
+    /* Re-declare legacy vars so they respond to theme switching */
+    --bg-dark:    #1e1e24;
+    --bg-panel:   #2b2b36;
+    --primary:    #4a90e2;
+    --text-main:  #e0e0e0;
+    --text-muted: #a0a0a0;
+    --accent:     #ff4757;
+}
+
+/* ─── Light mode ────────────────────────────────────────── */
+:root[data-theme="light"] {
+    --color-bg-1:    #f4f4f8;
+    --color-bg-2:    #ffffff;
+    --color-bg-3:    #eaeaf0;
+    --color-text-1:  #1a1a2e;
+    --color-text-2:  #555566;
+    --color-text-3:  #888899;
+
+    /* Legacy vars — mapped to light equivalents */
+    --bg-dark:    #f4f4f8;
+    --bg-panel:   #ffffff;
+    --primary:    #3a7bd5;
+    --text-main:  #1a1a2e;
+    --text-muted: #555566;
+    --accent:     #e53935;
+}
+
+/* ─── Header: accommodate theme-toggle button ───────────── */
+header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.theme-toggle-btn {
+    background: transparent !important;
+    border: 1px solid var(--color-text-2) !important;
+    color: var(--text-main) !important;
+    font-size: 1rem;
+    line-height: 1;
+    padding: 4px 10px !important;
+    min-width: auto;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+}
+.theme-toggle-btn:hover {
+    background: var(--color-bg-3) !important;
+    border-color: var(--primary) !important;
+    filter: none !important;
+}
+
+/* ─── Utility ───────────────────────────────────────────── */
+.auto-dir { direction: auto; }

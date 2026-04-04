@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Subtitle Studio — AI Video Translation</title>
+<script>(function(){var t=localStorage.getItem('theme')||'dark';document.documentElement.setAttribute('data-theme',t);})();</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/vars.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
+</head>
+<body>
+
+<!-- ── Nav ──────────────────────────────────────────────────────────────── -->
+<nav class="landing-nav">
+  <a href="/" class="landing-brand">Subtitle Studio</a>
+  <div class="landing-nav-right">
+    {% if current_user.is_authenticated %}
+      <span style="font-size:0.85em;color:var(--color-text-2);">Hi, {{ current_user.display_name or current_user.email }}</span>
+      <button id="landing-nav-studio-btn" class="btn-accent-sm">Open Studio</button>
+      {% if current_user.is_admin %}
+      <a href="/dashboard" class="btn-accent-sm">📊 Dashboard</a>
+      {% endif %}
+      <a href="/auth/logout" class="btn-outline-sm">Logout</a>
+    {% else %}
+      <a href="/auth/login" class="btn-outline-sm">Sign In</a>
+      <a href="/auth/register" class="btn-accent-sm">Get Started Free</a>
+    {% endif %}
+    <button onclick="toggleTheme()" class="btn icon-btn theme-toggle-btn" title="Toggle theme">☀/☾</button>
+  </div>
+</nav>
+
+<!-- ── Hero ─────────────────────────────────────────────────────────────── -->
+<section class="hero">
+  <h1>Translate your videos —<br>instantly</h1>
+  <p>Upload any video, get AI-powered transcription and translation in 30+ languages.
+     Edit subtitles, choose a style, burn them in and download.</p>
+  <div class="btn-row">
+    {% if current_user.is_authenticated %}
+      <button id="landing-upload-cta" class="btn-primary-lg">Upload &amp; Start</button>
+      <a href="/jobs" class="btn-outline-lg">My Jobs</a>
+    {% else %}
+      <a href="/auth/register" class="btn-primary-lg">Get Started Free</a>
+      <a href="/auth/login"    class="btn-outline-lg">Sign In</a>
+    {% endif %}
+  </div>
+</section>
+
+<!-- ── How it works ──────────────────────────────────────────────────────── -->
+<section>
+  <h2 class="section-title">How it works</h2>
+  <div class="how-it-works">
+    <div class="step-card">
+      <div class="step-icon">▲</div>
+      <h3>Upload</h3>
+      <p>Drag &amp; drop any video file — MP4, MKV, AVI, MOV, WebM up to 500 MB.</p>
+    </div>
+    <div class="step-card">
+      <div class="step-icon">⚡</div>
+      <h3>Transcribe &amp; Translate</h3>
+      <p>AI detects the spoken language and translates to 30+ target languages in seconds.</p>
+    </div>
+    <div class="step-card">
+      <div class="step-icon">⬇</div>
+      <h3>Download</h3>
+      <p>Edit subtitles in the live preview, pick a style preset, burn in and download your video.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Language strip ────────────────────────────────────────────────────── -->
+<section class="lang-section">
+  <h2 class="section-title">Supported languages</h2>
+  <div class="lang-strip">
+    <span class="lang-pill" style="font-family:var(--font-arabic)">العربية</span>
+    <span class="lang-pill">English</span>
+    <span class="lang-pill">Français</span>
+    <span class="lang-pill">Español</span>
+    <span class="lang-pill">中文</span>
+    <span class="lang-pill">हिन्दी</span>
+    <span class="lang-pill">Türkçe</span>
+    <span class="lang-pill">Deutsch</span>
+    <span class="lang-pill">日本語</span>
+    <span class="lang-pill">Русский</span>
+    <span class="lang-pill">Português</span>
+    <span class="lang-pill">한국어</span>
+    <span class="lang-pill">Italiano</span>
+    <span class="lang-pill">Polski</span>
+    <span class="lang-pill">Română</span>
+    <span class="lang-pill">+ more</span>
+  </div>
+</section>
+
+<!-- ── Footer ────────────────────────────────────────────────────────────── -->
+<footer class="landing-footer">
+  <span>Subtitle Studio</span>
+  <span style="opacity:.5">·</span>
+  <span style="opacity:.6">© 2025</span>
+  <span style="opacity:.5">·</span>
+  <button onclick="toggleTheme()" class="btn icon-btn theme-toggle-btn" title="Toggle theme">☀/☾</button>
+</footer>
+
+<script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+
+{% if current_user.is_authenticated %}
+<!-- ── Upload Modal (landing page) ───────────────────────────────────────── -->
+<div id="landing-upload-modal" class="modal-overlay" style="display:none;" aria-modal="true" role="dialog" aria-label="Upload video">
+  <div class="modal" style="max-width:480px;width:90%;position:relative;">
+
+    <h2 style="margin-top:0;margin-bottom:18px;">Upload video &amp; choose translation</h2>
+
+    <div class="upload-zone" id="landing-upload-zone"
+         style="border:2px dashed var(--color-border,#555);border-radius:8px;padding:24px;text-align:center;cursor:pointer;">
+      <input type="file" id="landing-file-input" accept="video/*" style="display:none;">
+      <div id="landing-upload-hint" style="color:var(--color-text-2);">Click or drag &amp; drop a video file here</div>
+    </div>
+    <div id="landing-upload-status" style="margin-top:8px;font-size:0.85rem;color:var(--color-text-2);">No file chosen</div>
+
+    <label style="margin-top:14px;display:block;color:var(--color-text-2);font-size:0.9rem;">Translate to</label>
+    <select id="landing-target-lang" class="lang-select" style="width:100%;margin-top:4px;">
+      <option value="">(Keep original language)</option>
+      <option value="en">English</option>
+      <option value="es">Spanish</option>
+      <option value="fr">French</option>
+      <option value="de">German</option>
+      <option value="it">Italian</option>
+      <option value="pt">Portuguese</option>
+      <option value="ru">Russian</option>
+      <option value="ja">Japanese</option>
+      <option value="ko">Korean</option>
+      <option value="zh-CN">Chinese (Simplified)</option>
+      <option value="ar">Arabic</option>
+      <option value="hi">Hindi</option>
+    </select>
+
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+      <button id="landing-modal-close" class="btn secondary">Close</button>
+      <button id="landing-upload-btn" class="btn primary" disabled>Upload &amp; Open Studio</button>
+    </div>
+
+    <div id="landing-modal-progress" style="margin-top:10px;font-size:0.85rem;color:var(--color-text-2);min-height:1.2em;"></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const modal       = document.getElementById('landing-upload-modal');
+  const closeBtn    = document.getElementById('landing-modal-close');
+  const uploadZone  = document.getElementById('landing-upload-zone');
+  const fileInput   = document.getElementById('landing-file-input');
+  const statusEl    = document.getElementById('landing-upload-status');
+  const progressEl  = document.getElementById('landing-modal-progress');
+  const uploadBtn   = document.getElementById('landing-upload-btn');
+
+  // Modal is open by default; close button hides it so user can see landing page
+  function closeModal() {
+    modal.style.display = 'none';
+    document.body.style.overflow = '';
+  }
+
+  // Re-open if user clicks the CTA hero button or the nav "Open Studio" button
+  function openModal() {
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+  }
+
+  const ctaBtn = document.getElementById('landing-upload-cta');
+  if (ctaBtn) ctaBtn.addEventListener('click', openModal);
+
+  const navStudioBtn = document.getElementById('landing-nav-studio-btn');
+  if (navStudioBtn) navStudioBtn.addEventListener('click', openModal);
+
+  closeBtn.addEventListener('click', closeModal);
+
+  // Close on backdrop click
+  modal.addEventListener('click', function (e) {
+    if (e.target === modal) closeModal();
+  });
+
+  // Close on Escape key
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && modal.style.display !== 'none') closeModal();
+  });
+
+  // Upload zone click → file picker
+  uploadZone.addEventListener('click', function () { fileInput.click(); });
+
+  // Drag-and-drop on upload zone
+  uploadZone.addEventListener('dragover', function (e) {
+    e.preventDefault();
+    uploadZone.style.borderColor = 'var(--color-accent, #7c6af7)';
+  });
+  uploadZone.addEventListener('dragleave', function () {
+    uploadZone.style.borderColor = '';
+  });
+  uploadZone.addEventListener('drop', function (e) {
+    e.preventDefault();
+    uploadZone.style.borderColor = '';
+    const f = e.dataTransfer.files[0];
+    if (f && f.type.startsWith('video/')) {
+      setFile(f);
+    }
+  });
+
+  fileInput.addEventListener('change', function () {
+    const f = fileInput.files[0];
+    if (f) setFile(f);
+  });
+
+  function setFile(f) {
+    statusEl.textContent = f.name + ' (' + Math.round(f.size / 1024 / 1024) + ' MB)';
+    uploadBtn.disabled = false;
+    uploadBtn._file = f;
+  }
+
+  uploadBtn.addEventListener('click', async function () {
+    const f = uploadBtn._file;
+    if (!f) return;
+
+    const lang = document.getElementById('landing-target-lang').value;
+    uploadBtn.disabled = true;
+    progressEl.textContent = 'Uploading\u2026';
+
+    try {
+      const fd = new FormData();
+      fd.append('video', f);
+      const res  = await fetch('/upload_video', { method: 'POST', body: fd });
+      const data = await res.json();
+
+      if (!data.url) {
+        progressEl.textContent = 'Upload failed: ' + (data.error || 'unknown error');
+        uploadBtn.disabled = false;
+        return;
+      }
+
+      progressEl.textContent = 'Upload successful! Starting transcription…';
+
+      // Redirect to studio with job_id + lang so the studio can
+      // hide the startup modal and auto-start transcription immediately.
+      const dest = '/studio?job_id=' + encodeURIComponent(data.job_id)
+                 + (lang ? '&lang=' + encodeURIComponent(lang) : '');
+      window.location.href = dest;
+
+    } catch (err) {
+      progressEl.textContent = 'Network error during upload.';
+      uploadBtn.disabled = false;
+    }
+  });
+})();
+</script>
+{% endif %}
+</body>
+</html>
