@@ -4,7 +4,6 @@ Imported by both app.py (/burn route) and blueprints/api_v1.py (/api/v1/burn).
 Keeping this isolated avoids circular imports.
 """
 import os
-import shutil
 
 
 def time_to_ass_format(seconds: float) -> str:
@@ -17,14 +16,19 @@ def time_to_ass_format(seconds: float) -> str:
 
 
 def get_ffmpeg_exec() -> str | None:
-    """Return the ffmpeg executable path, or None if not found."""
-    candidates = [
-        os.path.join(os.getcwd(), 'ffmpeg-8.0.1-full_build', 'bin', 'ffmpeg.exe'),
-    ]
-    which = shutil.which('ffmpeg')
-    if which:
-        candidates.append(which)
-    return next((p for p in candidates if p and os.path.isfile(p)), None)
+    import shutil
+    # First: try system ffmpeg (Linux/Mac/production)
+    system_ffmpeg = shutil.which('ffmpeg')
+    if system_ffmpeg:
+        return system_ffmpeg
+
+    # Second: try local Windows build (development only)
+    local = os.path.join(os.getcwd(),
+                         'ffmpeg-8.0.1-full_build', 'bin', 'ffmpeg.exe')
+    if os.path.exists(local):
+        return local
+
+    return None
 
 
 def generate_ass_file(subtitles, style_config, video_width, video_height,
