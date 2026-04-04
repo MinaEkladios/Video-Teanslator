@@ -88,22 +88,23 @@ ALLOWED_EXTENSIONS = {'mp4', 'mkv', 'avi', 'mov', 'webm'}
 MAX_UPLOAD_BYTES   = 500 * 1024 * 1024  # 500 MB
 
 
-def get_video_duration(file_path):
-    """Use ffprobe to get video duration in seconds. Returns None on failure."""
-    candidates = [
-        os.path.join(os.getcwd(), 'ffmpeg-8.0.1-full_build', 'bin', 'ffprobe.exe'),
-    ]
-    which_ff = shutil.which('ffprobe')
-    if which_ff:
-        candidates.append(which_ff)
-    ffprobe_exe = next((p for p in candidates if p and os.path.isfile(p)), None)
-    if not ffprobe_exe:
+def get_video_duration(filepath):
+    import shutil
+    # Try system ffprobe first (Linux/production)
+    ffprobe = shutil.which('ffprobe')
+    # Fallback to local Windows build (development)
+    if not ffprobe:
+        local = os.path.join(os.getcwd(),
+                             'ffmpeg-8.0.1-full_build', 'bin', 'ffprobe.exe')
+        if os.path.exists(local):
+            ffprobe = local
+    if not ffprobe:
         return None
     try:
         result = subprocess.run(
             [
-                ffprobe_exe, '-v', 'quiet', '-print_format', 'json',
-                '-show_streams', '-select_streams', 'v:0', file_path,
+                ffprobe, '-v', 'quiet', '-print_format', 'json',
+                '-show_streams', '-select_streams', 'v:0', filepath,
             ],
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30,
         )

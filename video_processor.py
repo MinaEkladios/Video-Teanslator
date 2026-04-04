@@ -110,12 +110,22 @@ def _translate_batch_with_retry(translator, texts):
     return list(texts)
 
 # Configuration
-FFMPEG_BIN_PATH = os.path.join(os.getcwd(), 'ffmpeg-8.0.1-full_build', 'bin')
-FFMPEG_EXE = os.path.join(FFMPEG_BIN_PATH, 'ffmpeg.exe')
+import shutil as _shutil
 
-# Ensure FFMPEG is in PATH for whisper (which calls ffmpeg internally sometimes, 
-# although we will extract audio manually first to be safe and explicit as requested)
-os.environ["PATH"] += os.pathsep + FFMPEG_BIN_PATH
+# Try system ffmpeg first (Linux/production)
+FFMPEG_EXE = _shutil.which('ffmpeg')
+
+# Fallback to local Windows build (development only)
+if not FFMPEG_EXE:
+    FFMPEG_BIN_PATH = os.path.join(os.getcwd(),
+                                   'ffmpeg-8.0.1-full_build', 'bin')
+    _local = os.path.join(FFMPEG_BIN_PATH, 'ffmpeg.exe')
+    if os.path.exists(_local):
+        FFMPEG_EXE = _local
+
+# Only mutate PATH if local build exists
+if FFMPEG_EXE and 'ffmpeg-8.0.1' in FFMPEG_EXE:
+    os.environ["PATH"] += os.pathsep + os.path.dirname(FFMPEG_EXE)
 
 class VideoTranscriber:
     def __init__(self, model_size="base"):
