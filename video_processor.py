@@ -139,20 +139,29 @@ class VideoTranscriber:
 
     def extract_audio(self, video_path, audio_path):
         """Extract audio from video using local FFmpeg."""
+        import shutil
+        ffmpeg_exe = shutil.which('ffmpeg')
+        if not ffmpeg_exe:
+            local = os.path.join(os.getcwd(), 'ffmpeg-8.0.1-full_build', 'bin', 'ffmpeg.exe')
+            if os.path.exists(local):
+                ffmpeg_exe = local
+        if not ffmpeg_exe:
+            raise RuntimeError("FFmpeg not found in PATH")
+        
         command = [
-            FFMPEG_EXE, '-y',
+            ffmpeg_exe, '-y',
             '-i', video_path,
-            '-vn',              # No video
-            '-acodec', 'pcm_s16le', # Wav format
-            '-ar', '16000',     # 16k Hz
-            '-ac', '1',         # Mono
+            '-vn',
+            '-acodec', 'pcm_s16le',
+            '-ar', '16000',
+            '-ac', '1',
             audio_path
         ]
         try:
             subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         except subprocess.CalledProcessError as e:
             raise RuntimeError(f"FFmpeg audio extraction failed: {e.stderr.decode('utf-8')}")
-
+        
     def transcribe_and_translate(self, video_path, translate_to=None):
         """
         Full pipeline:
