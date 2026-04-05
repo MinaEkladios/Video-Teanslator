@@ -3,7 +3,7 @@ import json
 import subprocess
 import time
 from datetime import datetime, date, timedelta
-from flask import Flask, render_template, request, send_from_directory, jsonify, redirect
+from flask import Flask, render_template, request, send_from_directory, jsonify, redirect, send_file
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 from video_processor import transcriber, NoInternetError
@@ -130,8 +130,6 @@ def clear_folder(folder_path):
         except Exception as e:
             print(f'Failed to delete {file_path}. Reason: {e}')
 
-# time_to_ass_format, generate_ass_file and get_ffmpeg_exec
-# are imported from subtitle_utils above.
 
 @app.route('/')
 def index():
@@ -141,7 +139,6 @@ def index():
 @app.route('/studio')
 @login_required
 def studio():
-    # Without a job_id the studio is empty — send user to landing to upload first
     if not request.args.get('job_id'):
         return redirect('/')
     return render_template('index.html')
@@ -152,7 +149,6 @@ def studio():
 @app.route('/jobs')
 @login_required
 def jobs_page():
-    """List all jobs for the current user."""
     user_jobs = (Job.query
                  .filter_by(user_id=current_user.id)
                  .order_by(Job.created_at.desc())
@@ -175,7 +171,6 @@ def dashboard():
 @app.route('/dashboard/stats')
 @login_required
 def dashboard_stats():
-    """Return analytics JSON for the current user."""
     from sqlalchemy import func
 
     if not current_user.is_admin:
@@ -189,11 +184,10 @@ def dashboard_stats():
 
     base_q = UploadStats.query.filter_by(user_id=uid)
 
-    total_uploads   = base_q.count()
-    uploads_today   = base_q.filter(UploadStats.date == today).count()
+    total_uploads     = base_q.count()
+    uploads_today     = base_q.filter(UploadStats.date == today).count()
     uploads_this_week = base_q.filter(UploadStats.date >= week_ago).count()
 
-    # Aggregates
     agg = db.session.query(
         func.sum(UploadStats.duration_seconds),
         func.avg(UploadStats.duration_seconds),
@@ -206,20 +200,16 @@ def dashboard_stats():
     total_size_gb        = round((agg[2] or 0) / 1e9, 3)
     largest_upload_mb    = round((agg[3] or 0) / 1e6, 1)
 
-    success_count = base_q.filter(UploadStats.status == 'done').count()
+    success_count    = base_q.filter(UploadStats.status == 'done').count()
     success_rate_pct = round(success_count / total_uploads * 100, 1) if total_uploads else 0.0
 
-    # Uploads by day (last 30 days)
-    by_day_rows = (db.session.query(UploadStats.date,
-                                    func.count(UploadStats.id))
-                   .filter(UploadStats.user_id == uid,
-                           UploadStats.date >= month_ago)
+    by_day_rows = (db.session.query(UploadStats.date, func.count(UploadStats.id))
+                   .filter(UploadStats.user_id == uid, UploadStats.date >= month_ago)
                    .group_by(UploadStats.date)
                    .order_by(UploadStats.date)
                    .all())
     uploads_by_day = [{'date': str(r[0]), 'count': r[1]} for r in by_day_rows]
 
-    # Top 5 target languages
     tgt_rows = (db.session.query(UploadStats.target_lang, func.count(UploadStats.id))
                 .filter(UploadStats.user_id == uid, UploadStats.target_lang.isnot(None))
                 .group_by(UploadStats.target_lang)
@@ -231,7 +221,6 @@ def dashboard_stats():
         for r in tgt_rows
     ]
 
-    # Top 5 source languages
     src_rows = (db.session.query(UploadStats.source_lang, func.count(UploadStats.id))
                 .filter(UploadStats.user_id == uid, UploadStats.source_lang.isnot(None))
                 .group_by(UploadStats.source_lang)
@@ -243,7 +232,6 @@ def dashboard_stats():
         for r in src_rows
     ]
 
-    # File extension counts from filenames
     all_files = db.session.query(UploadStats.filename).filter_by(user_id=uid).all()
     ext_counts: dict = {}
     for (fname,) in all_files:
@@ -255,50 +243,46 @@ def dashboard_stats():
         key=lambda x: -x['count'],
     )[:5]
 
-    # Uploads by hour (from created_at)
-    all_created = (db.session.query(UploadStats.created_at)
-                   .filter_by(user_id=uid).all())
+    all_created = (db.session.query(UploadStats.created_at).filter_by(user_id=uid).all())
     hour_counts = [0] * 24
     for (ts,) in all_created:
         if ts:
             hour_counts[ts.hour] += 1
-    uploads_by_hour = [{'hour': h, 'count': hour_counts[h]} for h in range(24)]
+    uploads_by_hour  = [{'hour': h, 'count': hour_counts[h]} for h in range(24)]
     peak_upload_hour = hour_counts.index(max(hour_counts)) if total_uploads else 0
 
-    # Recent 10 uploads
     recent_rows = (base_q.order_by(UploadStats.created_at.desc()).limit(10).all())
     recent_uploads = [
         {
-            'filename':       r.filename,
-            'date':           r.created_at.isoformat() if r.created_at else None,
-            'source_lang':    r.source_lang,
-            'target_lang':    r.target_lang,
+            'filename':         r.filename,
+            'date':             r.created_at.isoformat() if r.created_at else None,
+            'source_lang':      r.source_lang,
+            'target_lang':      r.target_lang,
             'duration_seconds': r.duration_seconds,
             'file_size_bytes':  r.file_size_bytes,
-            'status':         r.status,
+            'status':           r.status,
         }
         for r in recent_rows
     ]
 
     payload = {
-        'total_uploads':         total_uploads,
-        'uploads_today':         uploads_today,
-        'uploads_this_week':     uploads_this_week,
-        'uploads_by_day':        uploads_by_day,
-        'total_duration_hours':  total_duration_hours,
-        'total_size_gb':         total_size_gb,
-        'avg_duration_minutes':  avg_duration_minutes,
-        'success_rate_pct':      success_rate_pct,
-        'top_target_languages':  top_target_languages,
-        'top_source_languages':  top_source_languages,
-        'most_common_file_ext':  most_common_file_ext,
-        'largest_upload_mb':     largest_upload_mb,
-        'peak_upload_hour':      peak_upload_hour,
-        'uploads_by_hour':       uploads_by_hour,
-        'recent_uploads':        recent_uploads,
+        'total_uploads':        total_uploads,
+        'uploads_today':        uploads_today,
+        'uploads_this_week':    uploads_this_week,
+        'uploads_by_day':       uploads_by_day,
+        'total_duration_hours': total_duration_hours,
+        'total_size_gb':        total_size_gb,
+        'avg_duration_minutes': avg_duration_minutes,
+        'success_rate_pct':     success_rate_pct,
+        'top_target_languages': top_target_languages,
+        'top_source_languages': top_source_languages,
+        'most_common_file_ext': most_common_file_ext,
+        'largest_upload_mb':    largest_upload_mb,
+        'peak_upload_hour':     peak_upload_hour,
+        'uploads_by_hour':      uploads_by_hour,
+        'recent_uploads':       recent_uploads,
     }
 
-    # Admins also see system-wide stats
     if current_user.is_admin:
         payload['system_total_uploads'] = UploadStats.query.count()
         payload['system_total_users']   = db.session.query(
@@ -306,11 +290,11 @@ def dashboard_stats():
 
     return jsonify(payload)
 
+
 @app.route('/upload_video', methods=['POST'])
 @login_required
 @limiter.limit('10/minute')
 def upload_video():
-    # Clear uploads folder before each new upload
     clear_folder(app.config['UPLOAD_FOLDER'])
 
     if 'video' not in request.files:
@@ -319,7 +303,6 @@ def upload_video():
     if not file.filename:
         return jsonify({'error': 'No selected file'}), 400
 
-    # ── Extension / mime validation ──────────────────────────────────────────
     filename = secure_filename(file.filename or '')
     ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else ''
     if ext not in ALLOWED_EXTENSIONS:
@@ -330,7 +313,6 @@ def upload_video():
     ):
         return jsonify({'ok': False, 'error': 'Invalid file type'}), 400
 
-    # ── Early size check from Content-Length header ───────────────────────
     if (request.content_length or 0) > MAX_UPLOAD_BYTES:
         return jsonify({'ok': False, 'error': 'File too large (max 500 MB)'}), 413
 
@@ -339,16 +321,13 @@ def upload_video():
     save_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
     file.save(save_path)
 
-    # ── Verify actual size on disk ────────────────────────────────────
     actual_size = os.path.getsize(save_path)
     if actual_size > MAX_UPLOAD_BYTES:
         os.remove(save_path)
         return jsonify({'ok': False, 'error': 'File too large (max 500 MB)'}), 413
 
-    # ── Duration via ffprobe (best-effort) ──────────────────────────────
     duration = get_video_duration(save_path)
 
-    # ── Create Job record ──────────────────────────────────────────
     job = Job(
         user_id=current_user.id if current_user.is_authenticated else None,
         input_filename=unique_filename,
@@ -360,7 +339,6 @@ def upload_video():
     db.session.add(job)
     db.session.commit()
 
-    # Log the upload immediately (pending — updated on completion)
     try:
         UploadStats.log_upload(job, status='pending')
     except Exception:
@@ -375,6 +353,7 @@ def upload_video():
         'thumbnail_url': None,
     })
 
+
 @app.route('/transcribe', methods=['POST'])
 @login_required
 def transcribe_video():
@@ -385,7 +364,6 @@ def transcribe_video():
     video_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
     if not os.path.abspath(video_path).startswith(os.path.abspath(app.config['UPLOAD_FOLDER'])):
         return jsonify({'error': 'Access denied'}), 403
-    # Allow passing a target language to translate after transcription
     target_lang = data.get('target_lang')
 
     if not os.path.exists(video_path):
@@ -395,7 +373,6 @@ def transcribe_video():
         result = transcriber.transcribe_and_translate(video_path, translate_to=target_lang)
         segments = result['segments']
 
-        # Update the Job record so the burn endpoint sees status='done'
         try:
             job = Job.query.filter_by(input_filename=filename).first()
             if job:
@@ -424,6 +401,7 @@ def transcribe_video():
         app.logger.error(f"Transcription failed: {e}")
         return jsonify({'error': str(e)}), 500
 
+
 @app.route('/translate_subtitles', methods=['POST'])
 @login_required
 def translate_subtitles_route():
@@ -447,9 +425,6 @@ def translate_subtitles_route():
 @app.route('/clear_session', methods=['POST'])
 @login_required
 def clear_session():
-    """Clear the uploads/exports folder for a fresh session.
-    This can be called when starting a new job or on unload from the client.
-    """
     try:
         clear_folder(app.config['UPLOAD_FOLDER'])
         return jsonify({'status': 'ok'})
@@ -457,13 +432,13 @@ def clear_session():
         app.logger.error(f"Clear session failed: {e}")
         return jsonify({'error': str(e)}), 500
 
+
 @app.route('/uploads/<filename>')
 @login_required
 def uploaded_file(filename):
     filename = secure_filename(filename)
     if not filename:
         return jsonify({'error': 'Invalid filename'}), 400
-    # Verify file belongs to current user
     job = Job.query.filter(
         (Job.input_filename == filename) | (Job.burned_path.like(f'%{filename}'))
     ).first()
@@ -472,9 +447,7 @@ def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 
-
 def generate_srt_content(subtitles):
-    """Convert subtitle list to SRT format string."""
     lines = []
     for i, sub in enumerate(subtitles, 1):
         start = sub.get('start', 0)
@@ -494,7 +467,6 @@ def generate_srt_content(subtitles):
 
 
 def generate_vtt_content(subtitles):
-    """Convert subtitle list to WebVTT format string."""
     lines = ['WEBVTT', '']
     for sub in subtitles:
         start = sub.get('start', 0)
@@ -515,6 +487,9 @@ def generate_vtt_content(subtitles):
 @app.route('/burn', methods=['POST'])
 @login_required
 def burn_subtitles():
+    output_path = None
+    ass_path = None
+
     data = request.json
     video_filename = secure_filename(data.get('filename') or '')
     if not video_filename:
@@ -526,10 +501,10 @@ def burn_subtitles():
     style_config = data.get('styles')
     video_width = data.get('videoWidth', 1280)
     video_height = data.get('videoHeight', 720)
-    
+
     if not subtitles:
         return jsonify({'error': 'Missing data'}), 400
-        
+
     if not os.path.exists(input_video_path):
         return jsonify({'error': 'Video file not found'}), 404
 
@@ -539,13 +514,11 @@ def burn_subtitles():
     play_res_w = data.get('playResWidth', video_width)
     play_res_h = data.get('playResHeight', video_height)
     generate_ass_file(subtitles, style_config, video_width, video_height, ass_path, play_res_w, play_res_h)
-    
+
     # 2. Burn using FFmpeg
     output_filename = f"burned_{video_filename}"
     output_path = os.path.join(app.config['UPLOAD_FOLDER'], output_filename)
 
-    # Escape path for FFmpeg filter
-    # Windows paths in filters need careful escaping. Forward slashes are safer.
     ass_path_filter = ass_path.replace('\\', '/').replace(':', '\\:')
 
     ffmpeg_exec = get_ffmpeg_exec()
@@ -555,7 +528,6 @@ def burn_subtitles():
             'note': 'Install FFmpeg or ensure ffmpeg-8.0.1-full_build/bin/ is present.'
         }), 500
 
-    # Build ffmpeg command (use list args)
     command = [
         ffmpeg_exec, '-y',
         '-i', input_video_path,
@@ -566,7 +538,7 @@ def burn_subtitles():
     ]
 
     try:
-        proc = subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     except subprocess.CalledProcessError as e:
         return jsonify({'error': 'FFmpeg failed', 'details': e.stderr.decode('utf-8', errors='ignore')}), 500
     except FileNotFoundError:
@@ -581,18 +553,26 @@ def burn_subtitles():
     except Exception:
         pass
 
-    return jsonify({
-        'url':          f'/uploads/{output_filename}',
-        'download_url': f'/uploads/{output_filename}',
-        'filename':     output_filename,
-        'srt_url':      f'/export/srt/{video_filename}',
-        'vtt_url':      f'/export/vtt/{video_filename}',
-    })
+    # 3. Stream the file directly as download then clean up
+    try:
+        return send_file(
+            output_path,
+            as_attachment=True,
+            download_name=f"subtitled_{video_filename}",
+            mimetype='video/mp4'
+        )
+    finally:
+        try:
+            if output_path and os.path.exists(output_path):
+                os.remove(output_path)
+            if ass_path and os.path.exists(ass_path):
+                os.remove(ass_path)
+        except Exception:
+            pass
 
 
 @app.route('/export/srt/<filename>')
 def export_srt(filename):
-    """Generate and serve an SRT subtitle file for a given video filename."""
     from flask import Response
     job = Job.query.filter(Job.input_filename == filename).order_by(Job.created_at.desc()).first()
     if not job or not job.segments:
@@ -612,7 +592,6 @@ def export_srt(filename):
 
 @app.route('/export/vtt/<filename>')
 def export_vtt(filename):
-    """Generate and serve a WebVTT subtitle file for a given video filename."""
     from flask import Response
     job = Job.query.filter(Job.input_filename == filename).order_by(Job.created_at.desc()).first()
     if not job or not job.segments:
