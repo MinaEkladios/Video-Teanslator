@@ -18,6 +18,7 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
+seed_db.py
 dev.db
 
 env/
