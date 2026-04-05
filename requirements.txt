@@ -7,11 +7,9 @@ Flask-SQLAlchemy==3.1.1
 Flask-Talisman==1.1.0
 gevent==23.9.1
 gunicorn==21.2.0
-numpy==2.4.3
 openai-whisper==20250625
 python-dotenv==1.0.1
 SQLAlchemy==2.0.48
-torch==2.10.0
+torch==2.1.2+cpu --extra-index-url https://download.pytorch.org/whl/cpu
 Werkzeug==3.1.6
-
 psycopg2-binary==2.9.9
