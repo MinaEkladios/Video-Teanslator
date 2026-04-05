@@ -178,6 +178,8 @@ class VideoTranscriber:
         try:
             # 1. Extract Audio
             print(f"Extracting audio to {audio_path}")
+            print(f"video_path type: {type(video_path)}, value: {video_path}")
+            print(f"audio_path type: {type(audio_path)}, value: {audio_path}")
             self.extract_audio(video_path, audio_path)
 
             # 2. Transcribe
