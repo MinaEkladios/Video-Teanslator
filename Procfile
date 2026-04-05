@@ -1,1 +1,1 @@
-web: gunicorn -w 1 -k gevent -b 0.0.0.0:$PORT app:app --timeout 600 --keep-alive 10
+web: gunicorn -w 1 -k gevent -b 0.0.0.0:$PORT app:app --timeout 1800 --keep-alive 10
