@@ -10,6 +10,5 @@ gunicorn==21.2.0
 openai-whisper==20250625
 python-dotenv==1.0.1
 SQLAlchemy==2.0.48
-torch==2.1.2+cpu --extra-index-url https://download.pytorch.org/whl/cpu
-Werkzeug==3.1.6
+torch==2.2.2+cpu --extra-index-url https://download.pytorch.org/whl/cpu
 psycopg2-binary==2.9.9
